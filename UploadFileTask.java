@@ -12,7 +12,6 @@ import com.google.gson.Gson;
 import com.vcc.pool.core.ClientConfig;
 import com.vcc.pool.core.ITask;
 import com.vcc.pool.core.base.BaseWorker;
-import com.vcc.pool.core.storage.db.rank.Ranking;
 import com.vcc.pool.core.storage.db.upload.Upload;
 import com.vcc.pool.core.storage.db.upload.UploadDAO;
 import com.vcc.pool.core.task.data.RemoteTaskData;
@@ -38,12 +37,11 @@ public class UploadFileTask extends BaseWorker {
     private ContentResolver contentResolver;
     private Upload item;
     private int linkIndex;
-    private String imagePath;
-    private UploadFileCallback uploadFileCallback;
+    public String filePath;
 
     public UploadFileTask(TaskID id, @NonNull TaskPriority taskPriority, @NonNull ITask callback,
                           @NonNull OkHttpClient client, @NonNull ClientConfig config,
-                          @NonNull UploadDAO uploadDAO, ContentResolver contentResolver, int type,Upload item,int linkIndex,String imagePath,UploadFileCallback uploadFileCallback) {
+                          @NonNull UploadDAO uploadDAO, ContentResolver contentResolver, int type, Upload item, int linkIndex, String filePath) {
         super(id, taskPriority, callback);
         this.client = client;
         this.config = config;
@@ -52,8 +50,7 @@ public class UploadFileTask extends BaseWorker {
         this.backgroundType = type;
         this.item = item;
         this.linkIndex = linkIndex;
-        this.imagePath = imagePath;
-        this.uploadFileCallback = uploadFileCallback;
+        this.filePath = filePath;
     }
 
     @Override
@@ -72,95 +69,25 @@ public class UploadFileTask extends BaseWorker {
                 msgError += "\nNullPointException : uploadDAO";
             }
             if (PoolHelper.isValidMsgError(msgError)) {
-//                List<Upload> uploads = PoolHelper.getValidUpload(uploadDAO, config.getUploadRetry(), backgroundType);
-//                if (uploads != null && uploads.size() > 0) {
-//                    for (int cardPostIndex = 0; cardPostIndex < uploads.size(); cardPostIndex++) {
-//                        Upload item = uploads.get(cardPostIndex);
-                        if (item != null && item.local != null && item.link != null) {
-                            List<String> locals = item.local;
-                            List<UploadTaskData> datas = item.link;
-//                            if (locals == null || datas == null) {
-//                                break;
-//                            }
+                if (item != null && item.local != null && item.link != null) {
+                    List<UploadTaskData> datas = item.link;
+                    UploadTaskData data = null;
+                    try {
+                        data = uploadFile(item, linkIndex, filePath);
 
-//                            if (locals.size() <= 0) {
-//                                PoolLogger.d(TAG, String.format("no file need upload]"));
-//                            } else if (datas.size() < locals.size()) {
-//                                for (int linkIndex = datas.size(); linkIndex < locals.size(); linkIndex++) {
-                                    UploadTaskData data = null;
-                                    try {
-                                        data = uploadFile(item, linkIndex,imagePath);
-                                    } catch (IOException ioe) {
-                                        ioe.printStackTrace();
-                                    }
-                                    if (data != null) {
-                                        PoolLogger.d(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
-                                                data.id, data.local, data.link, data.mediaType, data.width, data.height));
-//                                        datas.add(data);
-                                        uploadFileCallback.onUploadSuccess(data);
-                                        uploadDAO.updateLinkById(item.id, gson.toJson(datas));
-                                    } else {
-                                        uploadDAO.updateRetryById(item.id, ++item.retryCount);
+                    } catch (IOException ioe) {
+                        ioe.printStackTrace();
+                    }
+                    if (data != null) {
+                        PoolLogger.d(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
+                                data.id, data.local, data.link, data.mediaType, data.width, data.height));
+                        datas.add(data);
+                        uploadDAO.updateLinkById(item.id, gson.toJson(datas));
+                    } else {
+                        uploadDAO.updateRetryById(item.id, ++item.retryCount);
 //                                        break;
-                                    }
-//                                }
-//                            }
-
-//                            if (item.isNeedRequest) {
-//                                if (datas.size() == locals.size()) {
-//                                    config.uploadSuccess(item.uploadType, item.cardId, datas);
-//                                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOAD_SUCCESS.ordinal());
-//                                    String msg = null;
-////                                    try {
-////                                        msg = sendRequest(item, datas);
-////                                        PoolLogger.d(TAG, "Request success from server");
-////                                    } catch (IOException ioe) {
-////                                        ioe.printStackTrace();
-////                                    }
-//                                    if (!TextUtils.isEmpty(msg)) {
-//                                        PoolLogger.d(TAG, "Request success from server");
-//                                        if (item.isRankRequest) {
-//                                            List<Ranking> rankings = config.parseRequestData(item.uploadType, msg);
-//                                            if (rankings != null && rankings.size() > 0) {
-//                                                PoolLogger.d(TAG, "Request success has ranking : " + rankings.size());
-//                                                callback.localAddRank(id, rankings);
-//                                            } else {
-//                                                PoolLogger.d(TAG, "Request success no ranking object");
-//                                            }
-//                                            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-//                                            PoolLogger.d(TAG, "Request success update complete");
-//                                        } else {
-//                                            config.parseRequestData(item.uploadType, msg);
-//                                            PoolLogger.d(TAG, "Request success no need ranking");
-//                                            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-//                                            PoolLogger.d(TAG, "Request success update complete");
-//                                        }
-//                                    } else {
-//                                        PoolLogger.d(TAG, String.format("request send fail, can't parse from message"));
-//                                        uploadDAO.updateRetryById(item.id, ++item.retryCount);
-//                                    }
-//                                } else {
-//                                    PoolLogger.d(TAG, String.format("links size != local size, something error"));
-//                                    uploadDAO.updateRetryById(item.id, ++item.retryCount);
-//                                }
-//                            } else {
-//                                if (datas.size() == locals.size()) {
-//                                    config.uploadSuccess(item.uploadType, item.cardId, datas);
-//                                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-//                                } else {
-//                                    uploadDAO.updateRetryById(item.id, ++item.retryCount);
-//                                }
-//                            }
-
-                            if (item.retryCount >= config.getActionRetry()) {
-                                uploadDAO.updateStatusById(item.id, Upload.UploadStatus.FAIL.ordinal());
-                                config.uploadFail(item.cardId, item.retryCount);
-                            }
-                        }
-//                    }
-//                } else {
-//                    PoolLogger.d(TAG, String.format("No data to upload / send request"));
-//                }
+                    }
+                }
             } else {
                 PoolLogger.i(TAG, msgError);
             }
