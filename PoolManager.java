@@ -945,13 +945,18 @@ public class PoolManager {
                                     }
                                 } else {
                                     if (item.status != Upload.UploadStatus.UPLOAD_SUCCESS.ordinal())
-                                        for (int i = 0; i < datas.size(); i++) {
-                                            for (int linkIndex = 0; linkIndex < locals.size(); linkIndex++) {
-                                                if (!datas.get(i).local.equals(locals.get(linkIndex))) {
-                                                    String path = locals.get(linkIndex);
-                                                    UploadFileTask uploadFileTask = new UploadFileTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, contentResolver, backgroundType, item, linkIndex, path);
-                                                    cacheManager.pushTask(uploadFileTask);
+                                        for (int linkIndex = 0; linkIndex < locals.size(); linkIndex++) {
+                                            boolean isExist = false;
+                                            for (int i = 0; i < datas.size(); i++) {
+                                                if (locals.get(linkIndex).equals(datas.get(i).local)) {
+                                                    isExist = true;
+                                                    break;
                                                 }
+                                            }
+                                            if (!isExist) {
+                                                String path = locals.get(linkIndex);
+                                                UploadFileTask uploadFileTask = new UploadFileTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, contentResolver, backgroundType, item, linkIndex, path);
+                                                cacheManager.pushTask(uploadFileTask);
                                             }
                                         }
                                 }

@@ -46,7 +46,6 @@ public class RemoteSendRequestTask extends BaseWorker {
     public void run() {
         PoolLogger.i(TAG, "begin send request : " + backgroundType);
         try {
-            Gson gson = new Gson();
             String msgError = "";
             if (callback == null) {
                 msgError += "\nNullPointException : callback";
@@ -64,6 +63,7 @@ public class RemoteSendRequestTask extends BaseWorker {
                     List<String> locals = item.local;
                     final List<UploadTaskData> datas = item.link;
 
+                    PoolLogger.i(TAG, "data size:" + datas.size());
                     if (item.isNeedRequest) {
                         if (datas.size() == locals.size()) {
                             config.uploadSuccess(item.uploadType, item.cardId, datas);

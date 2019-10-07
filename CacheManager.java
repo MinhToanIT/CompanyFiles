@@ -154,7 +154,9 @@ public class CacheManager {
         if (task instanceof UploadFileTask) {
             for (BaseWorker item : tasks) {
                 if (item instanceof UploadFileTask) {
-                    if (item.id == task.id && ((UploadFileTask) item).filePath.equals(((UploadFileTask) task).filePath)) {
+                    if (item.id == task.id &&
+                            ((UploadFileTask) item).item.id == ((UploadFileTask) task).item.id &&
+                            ((UploadFileTask) item).filePath.equals(((UploadFileTask) task).filePath)) {
                         isNeedAdd = false;
                         break;
                     }

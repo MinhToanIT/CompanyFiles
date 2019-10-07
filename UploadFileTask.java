@@ -35,7 +35,7 @@ public class UploadFileTask extends BaseWorker {
     private ClientConfig config;
     private UploadDAO uploadDAO;
     private ContentResolver contentResolver;
-    private Upload item;
+    public Upload item;
     private int linkIndex;
     public String filePath;
 
@@ -72,6 +72,8 @@ public class UploadFileTask extends BaseWorker {
                 if (item != null && item.local != null && item.link != null) {
                     item = uploadDAO.getUploadById(item.id);
                     List<UploadTaskData> datas = item.link;
+                    PoolLogger.i(TAG, "id:" + item.id);
+                    PoolLogger.i(TAG, "links size:" + datas.size());
                     UploadTaskData data = null;
                     try {
                         data = uploadFile(item, linkIndex, filePath);
@@ -80,9 +82,10 @@ public class UploadFileTask extends BaseWorker {
                         ioe.printStackTrace();
                     }
                     if (data != null) {
-                        PoolLogger.d(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
+                        PoolLogger.i(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
                                 data.id, data.local, data.link, data.mediaType, data.width, data.height));
                         datas.add(data);
+                        PoolLogger.i(TAG, "links size1:" + datas.size());
                         uploadDAO.updateLinkById(item.id, gson.toJson(datas));
                     } else {
                         uploadDAO.updateRetryById(item.id, ++item.retryCount);
