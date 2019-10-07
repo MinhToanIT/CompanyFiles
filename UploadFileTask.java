@@ -70,6 +70,7 @@ public class UploadFileTask extends BaseWorker {
             }
             if (PoolHelper.isValidMsgError(msgError)) {
                 if (item != null && item.local != null && item.link != null) {
+                    item = uploadDAO.getUploadById(item.id);
                     List<UploadTaskData> datas = item.link;
                     UploadTaskData data = null;
                     try {

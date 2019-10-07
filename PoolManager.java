@@ -7,7 +7,6 @@ import android.net.ConnectivityManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
-import android.text.TextUtils;
 
 import com.google.gson.Gson;
 import com.vcc.pool.core.base.BaseWorker;
@@ -30,16 +29,12 @@ import com.vcc.pool.core.task.LocalRemoveTask;
 import com.vcc.pool.core.task.LocalUploadTask;
 import com.vcc.pool.core.task.RemoteActionTask;
 import com.vcc.pool.core.task.RemoteDataTask;
-import com.vcc.pool.core.task.RemoteUploadTask;
-import com.vcc.pool.core.task.UploadFileCallback;
+import com.vcc.pool.core.task.RemoteSendRequestTask;
 import com.vcc.pool.core.task.UploadFileTask;
-import com.vcc.pool.core.task.data.RemoteTaskData;
 import com.vcc.pool.core.task.data.UploadTaskData;
 import com.vcc.pool.util.PoolHelper;
 import com.vcc.pool.util.PoolLogger;
-import com.vcc.pool.util.RequestConfig;
 
-import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,8 +51,6 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
 import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 public class PoolManager {
     /*
@@ -288,7 +281,7 @@ public class PoolManager {
     }
 
     public void setMode(PoolData.Mode mode) {
-        if (!isValid()) return;
+        if (cacheManager == null) return;
         if (mode == null) {
             PoolLogger.i(TAG, "Set mode null : reject");
         }
@@ -296,8 +289,8 @@ public class PoolManager {
     }
 
     public void switchId(int id) {
-        if (!isValid()) return;
         currentId = id;
+        if (cacheManager == null) return;
         cacheManager.updateId(id);
     }
 
@@ -462,12 +455,12 @@ public class PoolManager {
     }
 
     public void registerGetFirstData(int id) {
-        if (!isValid()) return;
+        if (cacheManager == null) return;
         cacheManager.registerFirstData(id);
     }
 
     public void unRegisterGetFirstData(int id) {
-        if (!isValid()) return;
+        if (cacheManager == null) return;
         cacheManager.unregisterFirstData(id);
     }
 
@@ -590,9 +583,11 @@ public class PoolManager {
 
     private void upload(int type) {
         if (!isValidLocal()) return;
-        RemoteUploadTask task = new RemoteUploadTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, onCallback,
-                clientUpload, clientConfig, db.uploadDAO(), contentResolver, type, threadManager);
-        threadManager.addTask(task);
+//        RemoteUploadTask task = new RemoteUploadTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, onCallback,
+//                clientUpload, clientConfig, db.uploadDAO(), contentResolver, type);
+//        threadManager.addTask(task);
+        if (cacheManager.pullTask().size() != 0)
+            threadManager.addTask(cacheManager.pullTask().get(0));
     }
 
     private void action() {
@@ -614,7 +609,8 @@ public class PoolManager {
                     break;
                 case REMOTE_SHORT_TERM:
                     requestHandler.removeCallbacksAndMessages(null);
-                    clientConfig.setRefresh(false);
+//                    clientConfig.setRefresh(false);
+//                    cacheManager.changeClientWaitState(false);
                     break;
             }
             localInsertRank(data);
@@ -650,6 +646,8 @@ public class PoolManager {
 
         @Override
         public void pullData(int id, List<String> ids) {
+            clientConfig.setRefresh(false);
+            cacheManager.changeClientWaitState(false);
             pullDataToClient(id, ids);
         }
 
@@ -676,6 +674,13 @@ public class PoolManager {
                     break;
                 case REMOTE_SHORT_TERM:
 //                    add
+                    clientConfig.setRefresh(false);
+                    break;
+                case UPLOAD:
+                    cacheManager.pullTask().remove(0);
+                    if (cacheManager.pullTask().size() != 0)
+                        threadManager.addTask(cacheManager.pullTask().get(0));
+                    PoolLogger.i(TAG, "task size:" + cacheManager.pullTask().size());
                     break;
             }
             checkQueueTask(task);
@@ -713,6 +718,12 @@ public class PoolManager {
         @Override
         public void uploadFileFail(String id, String path) {
             clientConfig.uploadFileFail(id, path);
+        }
+
+        @Override
+        public void changeState() {
+            clientConfig.setRefresh(false);
+            cacheManager.changeClientWaitState(false);
         }
     }
 
@@ -882,10 +893,13 @@ public class PoolManager {
                         int type = Integer.parseInt(key.replace(SCHEDULE_UPLOAD_HANDLER, ""));
                         PoolLogger.i(TAG, "get data upload with type : " + type);
                         List<Upload> uploads = PoolHelper.getValidUpload(db.uploadDAO(), clientConfig.getUploadRetry(), type);
+                        PoolLogger.i(TAG, "uploads size:" + uploads.size());
                         if (uploads.size() > 0) {
-                            upload(type);
+                            checkUpload(db.uploadDAO(), onCallback, type);
+//                            upload(type);
                         } else {
                             PoolLogger.i(TAG, "no data upload with type : " + type);
+
                         }
                     }
                 } catch (Exception e) {
@@ -896,9 +910,8 @@ public class PoolManager {
         }
     }
 
-    private void uploadFile(PoolData.TaskID id,UploadDAO uploadDAO, OnCallbackFromTask callback, int backgroundType){
+    private void checkUpload(final UploadDAO uploadDAO, final OnCallbackFromTask callback, int backgroundType) {
         try {
-            Gson gon = new Gson();
             String msgError = "";
             if (callback == null) {
                 msgError += "\nNullPointException : callback";
@@ -913,107 +926,44 @@ public class PoolManager {
                 List<Upload> uploads = PoolHelper.getValidUpload(uploadDAO, clientConfig.getUploadRetry(), backgroundType);
                 if (uploads != null && uploads.size() > 0) {
                     for (int cardPostIndex = 0; cardPostIndex < uploads.size(); cardPostIndex++) {
-                        Upload item = uploads.get(cardPostIndex);
+                        final Upload item = uploads.get(cardPostIndex);
                         if (item != null && item.local != null && item.link != null) {
-                            List<String> locals = item.local;
+                            final List<String> locals = item.local;
                             final List<UploadTaskData> datas = item.link;
                             if (locals == null || datas == null) {
                                 break;
                             }
-
                             if (locals.size() <= 0) {
                                 PoolLogger.d(TAG, String.format("no file need upload]"));
                             } else if (datas.size() < locals.size()) {
-                                for (int linkIndex = datas.size(); linkIndex < locals.size(); linkIndex++) {
-                                    UploadTaskData data = null;
-//                                    try {
-                                    String path = locals.get(linkIndex);
-                                    UploadFileTask uploadFileTask = new UploadFileTask(PoolData.TaskID.UPLOAD_FILE, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, contentResolver, backgroundType, item, linkIndex, path, new UploadFileCallback() {
-                                        @Override
-                                        public void onUploadSuccess(UploadTaskData data) {
-                                            datas.add(data);
-                                        }
 
-                                        @Override
-                                        public void onUploadFail() {
-
-                                        }
-                                    });
-                                    threadManager.addTask(uploadFileTask);
-
-//                                        if(PoolHelper.isImageFile(path)){
-//                                            data = RemoteUploadImageTask.getInstance(callback,client,config,contentResolver).uploadFile(item,linkIndex,path);
-//                                        }else{
-//                                            data = RemoteUploadVideoTask.getInstance(callback,client,config,contentResolver).uploadFile(item,linkIndex,path);
-//                                        }
-////                                        data = uploadFile(item, linkIndex, locals.get(linkIndex));
-//                                    } catch (IOException ioe) {
-//                                        ioe.printStackTrace();
-//                                    }
-//                                    if (data != null) {
-//                                        PoolLogger.d(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
-//                                                data.id, data.local, data.link, data.mediaType, data.width, data.height));
-//                                        datas.add(data);
-//                                        uploadDAO.updateLinkById(item.id, gson.toJson(datas));
-//                                    } else {
-//                                        uploadDAO.updateRetryById(item.id, ++item.retryCount);
-//                                        break;
-//                                    }
-                                }
-                            }
-
-                            if (item.isNeedRequest) {
-                                if (datas.size() == locals.size()) {
-                                    clientConfig.uploadSuccess(item.uploadType, item.cardId, datas);
-                                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOAD_SUCCESS.ordinal());
-                                    String msg = null;
-                                    try {
-                                        msg = sendRequest(item, datas);
-                                        PoolLogger.d(TAG, "Request success from server");
-                                    } catch (IOException ioe) {
-                                        ioe.printStackTrace();
+                                if (datas.size() == 0) {
+                                    for (int linkIndex = 0; linkIndex < locals.size(); linkIndex++) {
+                                        String path = locals.get(linkIndex);
+                                        UploadFileTask uploadFileTask = new UploadFileTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, contentResolver, backgroundType, item, linkIndex, path);
+                                        cacheManager.pushTask(uploadFileTask);
                                     }
-                                    if (!TextUtils.isEmpty(msg)) {
-                                        PoolLogger.d(TAG, "Request success from server");
-                                        if (item.isRankRequest) {
-                                            List<Ranking> rankings = clientConfig.parseRequestData(item.uploadType, msg);
-                                            if (rankings != null && rankings.size() > 0) {
-                                                PoolLogger.d(TAG, "Request success has ranking : " + rankings.size());
-                                                callback.localAddRank(id, rankings);
-                                            } else {
-                                                PoolLogger.d(TAG, "Request success no ranking object");
+                                } else {
+                                    if (item.status != Upload.UploadStatus.UPLOAD_SUCCESS.ordinal())
+                                        for (int i = 0; i < datas.size(); i++) {
+                                            for (int linkIndex = 0; linkIndex < locals.size(); linkIndex++) {
+                                                if (!datas.get(i).local.equals(locals.get(linkIndex))) {
+                                                    String path = locals.get(linkIndex);
+                                                    UploadFileTask uploadFileTask = new UploadFileTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, contentResolver, backgroundType, item, linkIndex, path);
+                                                    cacheManager.pushTask(uploadFileTask);
+                                                }
                                             }
-                                            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-                                            PoolLogger.d(TAG, "Request success update complete");
-                                        } else {
-                                            clientConfig.parseRequestData(item.uploadType, msg);
-                                            PoolLogger.d(TAG, "Request success no need ranking");
-                                            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-                                            PoolLogger.d(TAG, "Request success update complete");
                                         }
-                                    } else {
-                                        PoolLogger.d(TAG, String.format("request send fail, can't parse from message"));
-                                        uploadDAO.updateRetryById(item.id, ++item.retryCount);
-                                    }
-                                } else {
-                                    PoolLogger.d(TAG, String.format("links size != local size, something error"));
-                                    uploadDAO.updateRetryById(item.id, ++item.retryCount);
                                 }
-                            } else {
-                                if (datas.size() == locals.size()) {
-                                    clientConfig.uploadSuccess(item.uploadType, item.cardId, datas);
-                                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
-                                } else {
-                                    uploadDAO.updateRetryById(item.id, ++item.retryCount);
-                                }
-                            }
 
-                            if (item.retryCount >= clientConfig.getActionRetry()) {
-                                uploadDAO.updateStatusById(item.id, Upload.UploadStatus.FAIL.ordinal());
-                                clientConfig.uploadFail(item.cardId, item.retryCount);
+                                RemoteSendRequestTask remoteSendRequestTask = new RemoteSendRequestTask(PoolData.TaskID.UPLOAD, PoolData.TaskPriority.MEDIUM, callback, client, clientConfig, uploadDAO, backgroundType, item);
+                                cacheManager.pushTask(remoteSendRequestTask);
                             }
                         }
+
                     }
+                    upload(backgroundType);
+
                 } else {
                     PoolLogger.d(TAG, String.format("No data to upload / send request"));
                 }
@@ -1023,44 +973,8 @@ public class PoolManager {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-//            callback.complete(this);
             PoolLogger.i(TAG, "end");
         }
     }
-    private String sendRequest(Upload item, List<UploadTaskData> links) throws IOException {
-        if (item == null) {
-            PoolLogger.d(TAG, String.format("NullPointException : item"));
-            return null;
-        }
-        if (onCallback != null && !PoolHelper.isValidNetwork(onCallback.getNetworkState())) {
-            PoolLogger.d(TAG, String.format("No Network"));
-            return null;
-        }
-        RemoteTaskData requestData = clientConfig.getRequest(item.uploadType, item.cardId, links);
-        if (requestData == null) {
-            PoolLogger.d(TAG, String.format("Can't create remote task data with id[%s] - type[%s]", item.cardId, item.uploadType));
-            return null;
-        }
-        PoolLogger.i(TAG, String.format("sendRequest url[%s] - jsonString : %s", requestData.url, requestData.jsonData));
-        RequestConfig requestConfig = new RequestConfig()
-                .setType(requestData.requestType)
-                .setUrl(requestData.url)
-                .setJsonString(requestData.jsonData)
-                .setHeaders(requestData.headers)
-                .setParams(requestData.params)
-                .setContent(requestData.binaryData);
-        if (requestConfig != null) {
-            Request request = PoolHelper.createRequest(requestConfig);
-            Response response = client.newCall(request).execute();
-            if (response != null && response.isSuccessful()) {
-                PoolLogger.i(String.format("Send request success : message[%s] - body[%s]", response.message(), response.body().toString()));
-                return PoolHelper.getResponseString(response);
-            } else {
-                int code = response.code();
-                String msg = response.message();
-                PoolLogger.i(String.format("Send request fail code[%s] with message : %s", code, msg));
-            }
-        }
-        return null;
-    }
+
 }

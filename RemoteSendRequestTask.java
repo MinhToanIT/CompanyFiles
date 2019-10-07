@@ -44,7 +44,7 @@ public class RemoteSendRequestTask extends BaseWorker {
 
     @Override
     public void run() {
-        PoolLogger.i(TAG, "begin upload : " + backgroundType);
+        PoolLogger.i(TAG, "begin send request : " + backgroundType);
         try {
             Gson gson = new Gson();
             String msgError = "";
@@ -125,7 +125,7 @@ public class RemoteSendRequestTask extends BaseWorker {
             e.printStackTrace();
         } finally {
             callback.complete(this);
-            PoolLogger.i(TAG, "end");
+            PoolLogger.i(TAG, "Send request end");
         }
     }
 
@@ -153,6 +153,7 @@ public class RemoteSendRequestTask extends BaseWorker {
                 .setContent(requestData.binaryData);
         if (requestConfig != null) {
             Request request = PoolHelper.createRequest(requestConfig);
+            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
             Response response = client.newCall(request).execute();
             if (response != null && response.isSuccessful()) {
                 PoolLogger.i(String.format("Send request success : message[%s] - body[%s]", response.message(), response.body().toString()));
