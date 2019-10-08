@@ -153,9 +153,9 @@ public class RemoteSendRequestTask extends BaseWorker {
                 .setContent(requestData.binaryData);
         if (requestConfig != null) {
             Request request = PoolHelper.createRequest(requestConfig);
-            Response response = client.newCall(request).execute();
 
             uploadDAO.updateStatusById(item.id, Upload.UploadStatus.SENDING_REQUEST.ordinal());
+            Response response = client.newCall(request).execute();
 
             if (response != null && response.isSuccessful()) {
                 PoolLogger.i(String.format("Send request success : message[%s] - body[%s]", response.message(), response.body().toString()));

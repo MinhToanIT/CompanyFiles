@@ -84,19 +84,19 @@ public class UploadFileTask extends BaseWorker {
                     if (data != null) {
                         PoolLogger.i(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
                                 data.id, data.local, data.link, data.mediaType, data.width, data.height));
-                        if (datas.size() == 0) {
+//                        if (datas.size() == 0) {
                             datas.add(data);
-                        } else {
-                            boolean isNeedAdd = true;
-                            for (int i = 0; i < datas.size(); i++) {
-                                if (datas.get(i).local.equals(data.local)) {
-                                    isNeedAdd = false;
-                                    break;
-                                }
-                            }
-                            if (isNeedAdd)
-                                datas.add(data);
-                        }
+//                        } else {
+//                            boolean isNeedAdd = true;
+//                            for (int i = 0; i < datas.size(); i++) {
+//                                if (datas.get(i).local.equals(data.local)) {
+//                                    isNeedAdd = false;
+//                                    break;
+//                                }
+//                            }
+//                            if (isNeedAdd)
+//                                datas.add(data);
+//                        }
 
                         PoolLogger.i(TAG, "links size1:" + datas.size());
                         uploadDAO.updateLinkById(item.id, gson.toJson(datas));
@@ -205,8 +205,8 @@ public class UploadFileTask extends BaseWorker {
                 if (requestConfig != null) {
                     PoolLogger.d(TAG, String.format("create requestConfig success"));
                     Request request = PoolHelper.createRequest(requestConfig, contentResolver);
-                    Response response = client.newCall(request).execute();
                     uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
+                    Response response = client.newCall(request).execute();
                     String result = PoolHelper.getResponseString(response);
                     UploadTaskData uploadTaskData = config.parseUploadData(item.uploadType, type, result);
 
