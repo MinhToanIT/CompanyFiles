@@ -25,6 +25,7 @@ public class CacheManager {
     private Map<Integer, List<List<Integer>>> patternMap;
     private List<Integer> getFirstDataIdsMap;
     private List<BaseWorker> tasks;
+    private int currentTaskIndex;
 
     private boolean clientWaitData;
     private PoolData.Mode mode;
@@ -180,6 +181,17 @@ public class CacheManager {
 
     public List<BaseWorker> pullTask() {
         return tasks;
+    }
+
+    /*
+     * Area : current task index
+     */
+    public void setCurrentTaskIndex(int currentTaskIndex) {
+        this.currentTaskIndex = currentTaskIndex;
+    }
+
+    public int getCurrentTaskIndex() {
+        return currentTaskIndex;
     }
 
     /*

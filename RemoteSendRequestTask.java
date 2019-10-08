@@ -65,7 +65,7 @@ public class RemoteSendRequestTask extends BaseWorker {
 
                     PoolLogger.i(TAG, "data size:" + datas.size());
                     if (item.isNeedRequest) {
-                        if (datas.size() == locals.size()) {
+                        if (datas.size() >= locals.size()) {
                             config.uploadSuccess(item.uploadType, item.cardId, datas);
                             uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOAD_SUCCESS.ordinal());
                             String msg = null;
@@ -102,7 +102,7 @@ public class RemoteSendRequestTask extends BaseWorker {
                             uploadDAO.updateRetryById(item.id, ++item.retryCount);
                         }
                     } else {
-                        if (datas.size() == locals.size()) {
+                        if (datas.size() >= locals.size()) {
                             config.uploadSuccess(item.uploadType, item.cardId, datas);
                             uploadDAO.updateStatusById(item.id, Upload.UploadStatus.COMPELE.ordinal());
                         } else {
@@ -153,8 +153,10 @@ public class RemoteSendRequestTask extends BaseWorker {
                 .setContent(requestData.binaryData);
         if (requestConfig != null) {
             Request request = PoolHelper.createRequest(requestConfig);
-            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
             Response response = client.newCall(request).execute();
+
+            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.SENDING_REQUEST.ordinal());
+
             if (response != null && response.isSuccessful()) {
                 PoolLogger.i(String.format("Send request success : message[%s] - body[%s]", response.message(), response.body().toString()));
                 return PoolHelper.getResponseString(response);
@@ -164,6 +166,7 @@ public class RemoteSendRequestTask extends BaseWorker {
                 PoolLogger.i(String.format("Send request fail code[%s] with message : %s", code, msg));
             }
         }
+        uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOAD_SUCCESS.ordinal());
         return null;
     }
 }

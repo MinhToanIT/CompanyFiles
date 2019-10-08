@@ -84,7 +84,20 @@ public class UploadFileTask extends BaseWorker {
                     if (data != null) {
                         PoolLogger.i(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
                                 data.id, data.local, data.link, data.mediaType, data.width, data.height));
-                        datas.add(data);
+                        if (datas.size() == 0) {
+                            datas.add(data);
+                        } else {
+                            boolean isNeedAdd = true;
+                            for (int i = 0; i < datas.size(); i++) {
+                                if (datas.get(i).local.equals(data.local)) {
+                                    isNeedAdd = false;
+                                    break;
+                                }
+                            }
+                            if (isNeedAdd)
+                                datas.add(data);
+                        }
+
                         PoolLogger.i(TAG, "links size1:" + datas.size());
                         uploadDAO.updateLinkById(item.id, gson.toJson(datas));
                     } else {
@@ -193,8 +206,10 @@ public class UploadFileTask extends BaseWorker {
                     PoolLogger.d(TAG, String.format("create requestConfig success"));
                     Request request = PoolHelper.createRequest(requestConfig, contentResolver);
                     Response response = client.newCall(request).execute();
+                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
                     String result = PoolHelper.getResponseString(response);
                     UploadTaskData uploadTaskData = config.parseUploadData(item.uploadType, type, result);
+
                     if (uploadTaskData != null && !TextUtils.isEmpty(uploadTaskData.link)) {
                         PoolLogger.d(TAG, String.format("parse success from server link[%s]", uploadTaskData.link));
                         uploadTaskData.mediaType = type;
@@ -214,6 +229,7 @@ public class UploadFileTask extends BaseWorker {
             e.printStackTrace();
         }
         callback.uploadFileFail(item.cardId, path);
+        uploadDAO.updateStatusById(item.id, Upload.UploadStatus.PENDING.ordinal());
         return null;
     }
 
