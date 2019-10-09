@@ -30,6 +30,8 @@ public class CacheManager {
     private boolean clientWaitData;
     private PoolData.Mode mode;
 
+    private boolean isNeedCheckUploading = true;
+
     public CacheManager() {
         rankings = new ArrayList<>();
         actions = new ArrayList<>();
@@ -192,6 +194,17 @@ public class CacheManager {
 
     public int getCurrentTaskIndex() {
         return currentTaskIndex;
+    }
+
+    /*
+     * Area : check if need to check the items are uploading
+     */
+    public void setNeedCheckUploading(boolean isNeedCheckUploading) {
+        this.isNeedCheckUploading = isNeedCheckUploading;
+    }
+
+    public boolean isNeedCheckUploading() {
+        return isNeedCheckUploading;
     }
 
     /*

@@ -344,7 +344,18 @@ public class PoolHelper {
     public static List<Upload> getValidUpload(UploadDAO uploadDAO, int retryLimit, List<Integer> type) {
         List<Integer> status = new ArrayList<>();
         status.add(Upload.UploadStatus.PENDING.ordinal());
-//        status.add(Upload.UploadStatus.UPLOADING.ordinal());
+        return uploadDAO.getByStatus(status, retryLimit, type);
+    }
+
+    public static List<Upload> getValidUploading(UploadDAO uploadDAO, int retryLimit, final int type) {
+        return getValidUploading(uploadDAO, retryLimit, new ArrayList<Integer>() {{
+            add(type);
+        }});
+    }
+
+    public static List<Upload> getValidUploading(UploadDAO uploadDAO, int retryLimit, List<Integer> type) {
+        List<Integer> status = new ArrayList<>();
+        status.add(Upload.UploadStatus.UPLOADING.ordinal());
         return uploadDAO.getByStatus(status, retryLimit, type);
     }
 

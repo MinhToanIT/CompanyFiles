@@ -76,6 +76,7 @@ public class UploadFileTask extends BaseWorker {
                     PoolLogger.i(TAG, "links size:" + datas.size());
                     UploadTaskData data = null;
                     try {
+                        uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
                         data = uploadFile(item, linkIndex, filePath);
 
                     } catch (IOException ioe) {
@@ -84,25 +85,12 @@ public class UploadFileTask extends BaseWorker {
                     if (data != null) {
                         PoolLogger.i(TAG, String.format("upload success id[%s] - local[%s] - link[%s] - type[%s] - width[%s] - height[%s]",
                                 data.id, data.local, data.link, data.mediaType, data.width, data.height));
-//                        if (datas.size() == 0) {
-                            datas.add(data);
-//                        } else {
-//                            boolean isNeedAdd = true;
-//                            for (int i = 0; i < datas.size(); i++) {
-//                                if (datas.get(i).local.equals(data.local)) {
-//                                    isNeedAdd = false;
-//                                    break;
-//                                }
-//                            }
-//                            if (isNeedAdd)
-//                                datas.add(data);
-//                        }
 
+                        datas.add(data);
                         PoolLogger.i(TAG, "links size1:" + datas.size());
                         uploadDAO.updateLinkById(item.id, gson.toJson(datas));
                     } else {
                         uploadDAO.updateRetryById(item.id, ++item.retryCount);
-//                                        break;
                     }
                 }
             } else {
@@ -142,19 +130,12 @@ public class UploadFileTask extends BaseWorker {
             String duration = "";
             byte[] data = null;
             if (file != null && file.canRead() && file.isFile()) {
+
                 if (PoolHelper.isImageFile(path)) {
                     BitmapFactory.Options options = new BitmapFactory.Options();
                     options.inPreferredConfig = Bitmap.Config.ARGB_8888;
                     options.inJustDecodeBounds = true;
                     BitmapFactory.decodeFile(path, options);
-//                    options.inJustDecodeBounds = false;
-//                    Bitmap bitmap = BitmapFactory.decodeFile(path, options);
-//                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-//                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
-//                    data = stream.toByteArray();
-//                    bitmap.recycle();
-//                    width = options.outWidth;
-//                    height = options.outHeight;
                     ExifInterface ei = new ExifInterface(path);
                     int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
                     switch (orientation) {
@@ -205,7 +186,7 @@ public class UploadFileTask extends BaseWorker {
                 if (requestConfig != null) {
                     PoolLogger.d(TAG, String.format("create requestConfig success"));
                     Request request = PoolHelper.createRequest(requestConfig, contentResolver);
-                    uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
+
                     Response response = client.newCall(request).execute();
                     String result = PoolHelper.getResponseString(response);
                     UploadTaskData uploadTaskData = config.parseUploadData(item.uploadType, type, result);
@@ -229,7 +210,7 @@ public class UploadFileTask extends BaseWorker {
             e.printStackTrace();
         }
         callback.uploadFileFail(item.cardId, path);
-        uploadDAO.updateStatusById(item.id, Upload.UploadStatus.PENDING.ordinal());
+        uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOADING.ordinal());
         return null;
     }
 

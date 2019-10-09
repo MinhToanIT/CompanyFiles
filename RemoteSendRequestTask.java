@@ -65,7 +65,7 @@ public class RemoteSendRequestTask extends BaseWorker {
 
                     PoolLogger.i(TAG, "data size:" + datas.size());
                     if (item.isNeedRequest) {
-                        if (datas.size() >= locals.size()) {
+                        if (datas.size() == locals.size()) {
                             config.uploadSuccess(item.uploadType, item.cardId, datas);
                             uploadDAO.updateStatusById(item.id, Upload.UploadStatus.UPLOAD_SUCCESS.ordinal());
                             String msg = null;
@@ -110,7 +110,7 @@ public class RemoteSendRequestTask extends BaseWorker {
                         }
                     }
 
-                    if (item.retryCount >= config.getActionRetry()) {
+                    if (item.retryCount == config.getActionRetry()) {
                         uploadDAO.updateStatusById(item.id, Upload.UploadStatus.FAIL.ordinal());
                         config.uploadFail(item.cardId, item.retryCount);
                     }
@@ -154,8 +154,8 @@ public class RemoteSendRequestTask extends BaseWorker {
         if (requestConfig != null) {
             Request request = PoolHelper.createRequest(requestConfig);
 
-            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.SENDING_REQUEST.ordinal());
             Response response = client.newCall(request).execute();
+            uploadDAO.updateStatusById(item.id, Upload.UploadStatus.SENDING_REQUEST.ordinal());
 
             if (response != null && response.isSuccessful()) {
                 PoolLogger.i(String.format("Send request success : message[%s] - body[%s]", response.message(), response.body().toString()));

@@ -60,7 +60,8 @@ public interface PoolData {
 
         UPLOAD_ADD(30),
         UPLOAD(31),
-        SEND_REQUEST(32);
+        SEND_REQUEST(32),
+        UPLOADING(33);
 
         private int id;
 
@@ -71,7 +72,7 @@ public interface PoolData {
         public int getId() {
             return id;
         }
-        }
+    }
 
     enum Mode {
         RANK_FORMULA,

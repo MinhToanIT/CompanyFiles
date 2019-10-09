@@ -53,6 +53,7 @@ public class ThreadManager implements PoolData {
                 switch (task.id) {
                     case UPLOAD:
                     case SEND_REQUEST:
+                    case UPLOADING:
                         for (int i = 0; i < penddingTasks.size(); i++) {
                             BaseWorker item = penddingTasks.get(i);
                             PoolLogger.i(TAG, "pending task id:" + item.id.name());
@@ -97,7 +98,7 @@ public class ThreadManager implements PoolData {
     public void completeTask(BaseWorker worker) {
         runningTaskCount--;
         runningTasks.remove(worker);
-        if (worker.id != TaskID.UPLOAD && worker.id != TaskID.SEND_REQUEST)
+        if (worker.id != TaskID.UPLOAD && worker.id != TaskID.SEND_REQUEST&&worker.id != TaskID.UPLOADING)
             runTask();
         PoolLogger.d(TAG, String.format("completeTask : task[%s]", worker.id.name()));
         PoolLogger.d(TAG, "runningTaskCount-- = " + runningTaskCount);
@@ -180,6 +181,7 @@ public class ThreadManager implements PoolData {
                             break;
                         case UPLOAD:
                         case SEND_REQUEST:
+                        case UPLOADING:
                             if (validRunningTask(new ArrayList<TaskID>() {{
                                 add(task.id);
                             }}, task.backgroundType)) {
